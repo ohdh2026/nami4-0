@@ -30,6 +30,8 @@ export interface OperationLog {
   engineerName: string;
   crewIds: string[];
   crewNames: string[];
+  departureLocation: string;
+  arrivalLocation: string;
   departureTime: string;
   arrivalTime: string;
   passengerCount: number;

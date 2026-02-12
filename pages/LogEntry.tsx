@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Clock, Users, Fuel, Anchor, Save, Edit3, CheckCircle, AlertCircle, Ship as ShipIcon, UserCircle
+  Clock, Users, Fuel, Anchor, Save, Edit3, CheckCircle, AlertCircle, Ship as ShipIcon, MapPin
 } from 'lucide-react';
 import { User, Ship, UserRole, OperationLog } from '../types';
 
@@ -22,6 +22,8 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
     engineerName: '',
     crewIds: [],
     crewNames: [],
+    departureLocation: 'A',
+    arrivalLocation: 'B',
     departureTime: '',
     arrivalTime: '',
     passengerCount: 0,
@@ -30,6 +32,7 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
     status: 'draft'
   });
 
+  const locations = ['A', 'B', 'C'];
   const captains = users.filter(u => u.role === UserRole.CAPTAIN);
   const engineers = users.filter(u => u.role === UserRole.CHIEF_ENGINEER);
   const crews = users.filter(u => u.role === UserRole.CREW);
@@ -38,7 +41,6 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
     if (editingLog) {
       setFormData(editingLog);
     } else {
-      // 초기값 설정: 선장인 경우 본인 자동 선택
       if (currentUser.role === UserRole.CAPTAIN) {
         setFormData(prev => ({ 
           ...prev, 
@@ -72,13 +74,12 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
     });
   };
 
-  // 저장 가능 여부 (최소 선박/선장/기관장/출발시간/인원/유류는 있어야 함)
-  const canSaveDraft = !!(formData.shipName && formData.captainId && formData.engineerId && formData.departureTime);
+  const canSaveDraft = !!(formData.shipName && formData.captainId && formData.engineerId && formData.departureTime && formData.departureLocation && formData.arrivalLocation);
   const canSubmit = canSaveDraft && !!(formData.arrivalTime);
 
   const handleSave = (status: 'draft' | 'completed') => {
     if (!canSaveDraft) {
-      alert('필수 정보를 모두 입력해주세요 (선박, 선장, 기관장, 출발시간)');
+      alert('필수 정보를 모두 입력해주세요 (선박, 선장, 기관장, 출발지, 도착지, 출발시간)');
       return;
     }
 
@@ -91,6 +92,8 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
       engineerName: users.find(u => u.id === formData.engineerId)?.name || '',
       crewIds: formData.crewIds || [],
       crewNames: (formData.crewIds || []).map(id => users.find(u => u.id === id)?.name || ''),
+      departureLocation: formData.departureLocation!,
+      arrivalLocation: formData.arrivalLocation!,
       departureTime: formData.departureTime!,
       arrivalTime: formData.arrivalTime || '',
       passengerCount: Number(formData.passengerCount) || 0,
@@ -112,7 +115,7 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
           <Edit3 className="text-sky-600" />
           {editingLog ? '운항일지 수정' : '오늘의 운항 정보'}
         </h1>
-        <p className="text-slate-500">안전 운항을 위해 정확하게 입력해주세요.</p>
+        <p className="text-slate-500">출발지와 도착지를 확인하고 입력해주세요.</p>
       </header>
 
       {/* 1. 선박 및 인력 설정 */}
@@ -165,7 +168,7 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
             <span className="text-sm font-semibold text-slate-700 block mb-3">동승 승무원 선택</span>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {crews.map(u => (
-                <div key={u.id} className="relative">
+                <div key={u.id}>
                   <input 
                     type="checkbox" 
                     id={`crew-${u.id}`}
@@ -186,7 +189,58 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
         </div>
       </section>
 
-      {/* 2. 운항 시간 및 데이터 */}
+      {/* 2. 출발지 및 도착지 선택 (신규 추가) */}
+      <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+          <MapPin size={16} /> 운항 경로 (라디오 버튼 선택)
+        </h2>
+
+        <div className="space-y-6">
+          <div>
+            <span className="text-sm font-semibold text-slate-700 block mb-3">출발지 선택</span>
+            <div className="flex gap-3">
+              {locations.map(loc => (
+                <label key={`dep-${loc}`} className="flex-1">
+                  <input 
+                    type="radio" 
+                    name="departureLocation" 
+                    value={loc}
+                    checked={formData.departureLocation === loc}
+                    onChange={(e) => setFormData({...formData, departureLocation: e.target.value})}
+                    className="hidden peer"
+                  />
+                  <div className="p-4 text-center border-2 border-slate-100 bg-slate-50 rounded-xl cursor-pointer font-bold text-slate-500 transition-all peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-600">
+                    {loc} 지점
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="text-sm font-semibold text-slate-700 block mb-3">도착지 선택</span>
+            <div className="flex gap-3">
+              {locations.map(loc => (
+                <label key={`arr-${loc}`} className="flex-1">
+                  <input 
+                    type="radio" 
+                    name="arrivalLocation" 
+                    value={loc}
+                    checked={formData.arrivalLocation === loc}
+                    onChange={(e) => setFormData({...formData, arrivalLocation: e.target.value})}
+                    className="hidden peer"
+                  />
+                  <div className="p-4 text-center border-2 border-slate-100 bg-slate-50 rounded-xl cursor-pointer font-bold text-slate-500 transition-all peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-600">
+                    {loc} 지점
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. 운항 시간 및 데이터 */}
       <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-5">
         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
           <Clock size={16} /> 운항 기록
@@ -257,14 +311,13 @@ const LogEntry: React.FC<LogEntryProps> = ({ currentUser, ships, users, onSave, 
               rows={3}
               value={formData.memo}
               onChange={(e) => setFormData({...formData, memo: e.target.value})}
-              placeholder="특이사항이 있으면 입력하세요 (기상, 장비점검 등)"
+              placeholder="특이사항이 있으면 입력하세요"
               className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-sky-500"
             ></textarea>
           </label>
         </div>
       </section>
 
-      {/* 하단 고정 버튼 */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-slate-200 flex gap-3 z-40 no-print max-w-7xl mx-auto">
         <button 
           onClick={() => handleSave('draft')}

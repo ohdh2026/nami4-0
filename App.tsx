@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Ship, OperationLog, UserRole, PageView, TelegramConfig } from './types';
 import { db } from './services/db';
 import Layout from './components/Layout';
@@ -19,20 +19,42 @@ const App: React.FC = () => {
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>({ botToken: '', recipients: [] });
   const [activeView, setActiveView] = useState<PageView>('dashboard');
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  
+  const isInitialLoadRef = useRef(true);
 
-  // Initialize
+  // 1. 초기 데이터 로드
   useEffect(() => {
-    setUsers(db.getUsers());
-    setShips(db.getShips());
-    setLogs(db.getLogs());
-    setTelegramConfig(db.getTelegramConfig());
+    const loadedUsers = db.getUsers();
+    const loadedShips = db.getShips();
+    const loadedLogs = db.getLogs();
+    const loadedTelegram = db.getTelegramConfig();
+
+    setUsers(loadedUsers);
+    setShips(loadedShips);
+    setLogs(loadedLogs);
+    setTelegramConfig(loadedTelegram);
+    
+    setTimeout(() => {
+      isInitialLoadRef.current = false;
+    }, 100);
   }, []);
 
-  // Sync state to local DB
-  useEffect(() => { if (users.length) db.saveUsers(users); }, [users]);
-  useEffect(() => { if (ships.length) db.saveShips(ships); }, [ships]);
-  useEffect(() => { db.saveLogs(logs); }, [logs]);
-  useEffect(() => { db.saveTelegramConfig(telegramConfig); }, [telegramConfig]);
+  // 2. 상태 변경 시 로컬 스토리지 저장
+  useEffect(() => { 
+    if (!isInitialLoadRef.current) db.saveUsers(users); 
+  }, [users]);
+
+  useEffect(() => { 
+    if (!isInitialLoadRef.current) db.saveShips(ships); 
+  }, [ships]);
+
+  useEffect(() => { 
+    if (!isInitialLoadRef.current) db.saveLogs(logs); 
+  }, [logs]);
+
+  useEffect(() => { 
+    if (!isInitialLoadRef.current) db.saveTelegramConfig(telegramConfig); 
+  }, [telegramConfig]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -46,25 +68,16 @@ const App: React.FC = () => {
   const handleLogout = () => setCurrentUser(null);
 
   const saveLog = (log: OperationLog) => {
-    // Phase 7: Telegram notification logic (simulated)
-    const isNew = !logs.find(l => l.id === log.id);
-    const prevLog = !isNew ? logs.find(l => l.id === log.id) : null;
-    
-    // Arrival Alert Logic
-    if (log.status === 'completed' && log.arrivalTime && (!prevLog || !prevLog.arrivalTime)) {
-      console.log(`TELEGRAM ALERT: ${log.shipName} (${log.captainName}) 도착 완료 - 승선객: ${log.passengerCount}명`);
-    } else if (isNew && log.departureTime) {
-      console.log(`TELEGRAM ALERT: ${log.shipName} (${log.captainName}) 출발 - 기관장: ${log.engineerName}`);
-    }
-
     setLogs(prev => {
       const idx = prev.findIndex(l => l.id === log.id);
+      let next;
       if (idx > -1) {
-        const next = [...prev];
+        next = [...prev];
         next[idx] = log;
-        return next;
+      } else {
+        next = [log, ...prev];
       }
-      return [log, ...prev];
+      return next;
     });
     setEditingLogId(null);
     if (currentUser?.role === UserRole.ADMIN) {
@@ -72,7 +85,20 @@ const App: React.FC = () => {
     }
   };
 
-  const deleteLog = (id: string) => setLogs(prev => prev.filter(l => l.id !== id));
+  const deleteLog = (id: string) => {
+    setLogs(prev => {
+      const next = prev.filter(l => l.id !== id);
+      db.saveLogs(next);
+      return next;
+    });
+  };
+
+  // 모든 로그 한꺼번에 삭제
+  const deleteAllLogs = () => {
+    setLogs([]);
+    db.clearAllLogs();
+    console.log("All logs cleared.");
+  };
 
   const deleteUser = (id: string) => setUsers(prev => prev.filter(u => u.id !== id));
   const saveUser = (user: User) => setUsers(prev => {
@@ -96,7 +122,6 @@ const App: React.FC = () => {
     return [...prev, ship];
   });
 
-  // Login Screen
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
@@ -106,7 +131,7 @@ const App: React.FC = () => {
               <Anchor size={48} />
             </div>
             <h1 className="text-3xl font-bold text-slate-900">Naminara Republic</h1>
-            <p className="text-slate-500">운항관리 시스템 로그인 (데모용 역할 선택)</p>
+            <p className="text-slate-500">운항관리 시스템 로그인</p>
           </div>
           
           <div className="space-y-3">
@@ -134,7 +159,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Render Logic
   const renderView = () => {
     switch (activeView) {
       case 'dashboard': 
@@ -157,6 +181,7 @@ const App: React.FC = () => {
           ships={ships} 
           onEdit={(log) => {setEditingLogId(log.id); setActiveView('log-entry');}}
           onDelete={deleteLog}
+          onDeleteAll={deleteAllLogs}
         />;
       case 'user-mgmt': 
         return <UserManagement users={users} onSave={saveUser} onDelete={deleteUser} />;
