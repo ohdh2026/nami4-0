@@ -1,0 +1,5 @@
+{
+  "name": "Naminara Republic Vessel Log System",
+  "description": "A comprehensive maritime management system for vessel logs, crew scheduling, ship capacity monitoring, and Telegram-integrated alerts.",
+  "requestFramePermissions": []
+}
