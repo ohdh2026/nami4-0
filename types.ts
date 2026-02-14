@@ -21,6 +21,15 @@ export interface Ship {
   capacity: number;
 }
 
+export interface WeatherInfo {
+  temp: string;
+  condition: string;
+  windSpeed: string;
+  humidity: string;
+  sourceUrl: string;
+  lastUpdated: string;
+}
+
 export interface OperationLog {
   id: string;
   shipName: string;

@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Ship, OperationLog, UserRole, PageView, TelegramConfig } from './types';
+import { User, Ship, OperationLog, UserRole, PageView, TelegramConfig, WeatherInfo } from './types';
 import { db } from './services/db';
+import { fetchRealtimeWeather } from './services/weather';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import LogEntry from './pages/LogEntry';
@@ -16,6 +17,7 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [ships, setShips] = useState<Ship[]>([]);
   const [logs, setLogs] = useState<OperationLog[]>([]);
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>({ botToken: '', recipients: [] });
   const [activeView, setActiveView] = useState<PageView>('dashboard');
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
@@ -34,6 +36,9 @@ const App: React.FC = () => {
     setLogs(loadedLogs);
     setTelegramConfig(loadedTelegram);
     
+    // 실시간 날씨 로드
+    fetchRealtimeWeather().then(data => setWeather(data));
+
     setTimeout(() => {
       isInitialLoadRef.current = false;
     }, 100);
@@ -93,11 +98,9 @@ const App: React.FC = () => {
     });
   };
 
-  // 모든 로그 한꺼번에 삭제
   const deleteAllLogs = () => {
     setLogs([]);
     db.clearAllLogs();
-    console.log("All logs cleared.");
   };
 
   const deleteUser = (id: string) => setUsers(prev => prev.filter(u => u.id !== id));
@@ -165,6 +168,7 @@ const App: React.FC = () => {
         return <Dashboard 
           logs={logs} 
           ships={ships} 
+          weather={weather}
           onNavigateToLog={(id) => {setEditingLogId(id); setActiveView('log-entry');}} 
         />;
       case 'log-entry': 
@@ -190,7 +194,7 @@ const App: React.FC = () => {
       case 'telegram-settings': 
         return <TelegramSettings users={users} config={telegramConfig} onSaveConfig={setTelegramConfig} />;
       default: 
-        return <Dashboard logs={logs} ships={ships} onNavigateToLog={(id) => {setEditingLogId(id); setActiveView('log-entry');}} />;
+        return <Dashboard logs={logs} ships={ships} weather={weather} onNavigateToLog={(id) => {setEditingLogId(id); setActiveView('log-entry');}} />;
     }
   };
 

@@ -1,15 +1,19 @@
 
 import React, { useMemo } from 'react';
-import { Ship, OperationLog } from '../types';
-import { Activity, Anchor, Users, Fuel, Clock, ArrowRight, BarChart3, ArrowLeftRight, TrendingUp, Info } from 'lucide-react';
+import { Ship, OperationLog, WeatherInfo } from '../types';
+import { 
+  Activity, Anchor, Users, Fuel, Clock, ArrowRight, BarChart3, 
+  ArrowLeftRight, TrendingUp, Info, Cloud, Wind, Droplets, Thermometer, ExternalLink
+} from 'lucide-react';
 
 interface DashboardProps {
   logs: OperationLog[];
   ships: Ship[];
+  weather: WeatherInfo | null;
   onNavigateToLog: (logId: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) => {
+const Dashboard: React.FC<DashboardProps> = ({ logs, ships, weather, onNavigateToLog }) => {
   const inTransitLogs = logs.filter(l => l.departureTime && !l.arrivalTime);
   const todayStr = new Date().toISOString().split('T')[0];
   const completedLogsToday = logs.filter(l => l.arrivalTime && l.arrivalTime.startsWith(todayStr));
@@ -50,7 +54,6 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
   const getY = (val: number) => chartHeight - (val / maxVal) * (chartHeight - paddingY * 2) - paddingY;
   const getX = (idx: number) => (idx / (chartData.length - 1)) * (chartWidth - paddingX * 2) + paddingX;
 
-  // 부드러운 곡선(Cubic Bezier) 경로 생성 함수
   const createCurvedPath = (dataKey: 'ab' | 'ba') => {
     if (chartData.length === 0) return "";
     let path = `M ${getX(0)} ${getY(chartData[0][dataKey])}`;
@@ -69,6 +72,9 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
   const abCurvedPath = createCurvedPath('ab');
   const baCurvedPath = createCurvedPath('ba');
 
+  // 풍속에 따른 운항 주의 여부 (예: 10m/s 이상 시 주의)
+  const isWindy = weather ? parseFloat(weather.windSpeed) >= 10 : false;
+
   return (
     <div className="space-y-8 pb-10">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -82,33 +88,106 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
         </div>
       </header>
 
-      {/* 상단 주요 지표 카드 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: '운항 중인 선박', val: `${inTransitLogs.length}척`, icon: Activity, color: 'blue', tag: 'Live' },
-          { label: '오늘 총 승선객', val: `${totalPassengersToday.toLocaleString()}명`, icon: Users, color: 'green', tag: 'Today' },
-          { label: '오늘 운항 횟수', val: `${completedLogsToday.length}회`, icon: Clock, color: 'purple', tag: 'Today' },
-          { label: '관리 선박', val: `${ships.length}척`, icon: Anchor, color: 'slate', tag: 'Total' }
-        ].map((card, i) => (
-          <div key={i} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className={`p-3 bg-${card.color}-50 text-${card.color}-600 rounded-2xl`}>
-                <card.icon size={24}/>
+      {/* 기상 관제 위젯 및 주요 지표 */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Weather Card (Main Focus) */}
+        <div className="lg:col-span-2 bg-slate-900 rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl shadow-slate-200">
+           <div className="absolute top-0 right-0 p-8 opacity-10">
+              <Cloud size={180} />
+           </div>
+           
+           <div className="relative z-10 flex flex-col h-full justify-between">
+              <div className="flex justify-between items-start">
+                <div>
+                   <span className="inline-block px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest text-sky-400 border border-white/5 mb-2">
+                      Local Weather: Nami Island
+                   </span>
+                   <h2 className="text-xl font-black">실시간 기상 관제</h2>
+                </div>
+                <a href={weather?.sourceUrl} target="_blank" rel="noreferrer" className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors">
+                  <ExternalLink size={18} className="text-slate-400" />
+                </a>
               </div>
-              <span className={`text-[10px] font-black px-2 py-1 bg-${card.color}-100 text-${card.color}-700 rounded-lg uppercase tracking-wider`}>
-                {card.tag}
-              </span>
+
+              {weather ? (
+                <div className="py-8 flex items-center gap-10">
+                  <div className="flex items-center gap-4">
+                     <div className="p-4 bg-sky-500/20 rounded-3xl border border-sky-500/30">
+                        <Thermometer size={48} className="text-sky-400" />
+                     </div>
+                     <div>
+                        <p className="text-5xl font-black tracking-tighter">{weather.temp}</p>
+                        <p className="text-slate-400 font-bold">{weather.condition}</p>
+                     </div>
+                  </div>
+                  <div className="h-16 w-px bg-white/10 hidden sm:block"></div>
+                  <div className="grid grid-cols-2 gap-6 flex-1">
+                    <div className="space-y-1">
+                       <div className="flex items-center gap-2 text-slate-400">
+                          <Wind size={14} />
+                          <span className="text-[10px] font-black uppercase">Wind</span>
+                       </div>
+                       <p className={`text-lg font-black ${isWindy ? 'text-orange-400 animate-pulse' : 'text-white'}`}>{weather.windSpeed}</p>
+                    </div>
+                    <div className="space-y-1">
+                       <div className="flex items-center gap-2 text-slate-400">
+                          <Droplets size={14} />
+                          <span className="text-[10px] font-black uppercase">Humidity</span>
+                       </div>
+                       <p className="text-lg font-black">{weather.humidity}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-12 flex items-center justify-center text-slate-500 font-bold italic">
+                   기상 정보를 불러오는 중입니다...
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-6 border-t border-white/5">
+                 <p className="text-[11px] font-bold text-slate-500 italic">
+                   Source: NAVER Weather (Update: {weather?.lastUpdated || '-'})
+                 </p>
+                 {isWindy && (
+                   <div className="flex items-center gap-2 px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-[10px] font-black animate-bounce border border-red-500/30">
+                      강풍 주의: 운항 검토 필요
+                   </div>
+                 )}
+              </div>
+           </div>
+        </div>
+
+        {/* Top Indicators */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-6 lg:col-span-2">
+            <div className="grid grid-cols-2 gap-6 h-full">
+              {[
+                { label: '운항 중인 선박', val: `${inTransitLogs.length}척`, icon: Activity, color: 'blue', tag: 'Live' },
+                { label: '오늘 총 승선객', val: `${totalPassengersToday.toLocaleString()}명`, icon: Users, color: 'green', tag: 'Today' },
+                { label: '오늘 운항 횟수', val: `${completedLogsToday.length}회`, icon: Clock, color: 'purple', tag: 'Today' },
+                { label: '관리 선박', val: `${ships.length}척`, icon: Anchor, color: 'slate', tag: 'Total' }
+              ].map((card, i) => (
+                <div key={i} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className={`p-2 bg-${card.color}-50 text-${card.color}-600 rounded-xl`}>
+                      <card.icon size={20}/>
+                    </div>
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 bg-${card.color}-100 text-${card.color}-700 rounded uppercase`}>
+                      {card.tag}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-slate-400 text-[11px] font-bold">{card.label}</h3>
+                    <p className="text-2xl font-black text-slate-900">{card.val}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <h3 className="text-slate-400 text-sm font-bold">{card.label}</h3>
-            <p className="text-3xl font-black text-slate-900 mt-1">{card.val}</p>
-          </div>
-        ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* 노선별 상세 테이블 */}
         <div className="lg:col-span-2">
-          <section className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col">
+          <section className="bg-white rounded-[32px] shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col">
             <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">
@@ -152,7 +231,6 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
           </section>
         </div>
 
-        {/* 실시간 사이드바 */}
         <div className="lg:col-span-1 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
@@ -194,7 +272,6 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
             )}
           </div>
 
-          {/* 선박 정원 요약 */}
           <div className="bg-slate-900 p-6 rounded-3xl shadow-xl text-white">
             <h3 className="text-sm font-black mb-6 flex items-center gap-2 text-sky-400">
                 <BarChart3 size={16} /> 선박별 실시간 혼잡도
@@ -210,7 +287,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
                       <span className={ratio > 90 ? 'text-red-400' : 'text-sky-400'}>{Math.round(ratio)}%</span>
                     </div>
                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                      <div className={`h-full transition-all duration-1000 ease-out ${ratio > 90 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]'}`} style={{ width: `${Math.max(2, Math.min(ratio, 100))}%` }}></div>
+                      <div className={`h-full transition-all duration-1000 ease-out ${ratio > 90 ? 'bg-red-500' : 'bg-sky-500'}`} style={{ width: `${Math.max(2, Math.min(ratio, 100))}%` }}></div>
                     </div>
                   </div>
                 );
@@ -220,7 +297,6 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
         </div>
       </div>
 
-      {/* 전문가용 승선 추이 곡선 그래프 (Upgrade) */}
       <section className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-200">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
             <div className="flex items-center gap-4">
@@ -261,7 +337,6 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
                 </linearGradient>
               </defs>
 
-              {/* Guide Lines */}
               {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
                 <g key={i}>
                   <line x1={paddingX} y1={getY(maxVal * p)} x2={chartWidth - paddingX} y2={getY(maxVal * p)} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4 4" />
@@ -269,20 +344,17 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
                 </g>
               ))}
 
-              {/* Area Under Curves */}
               <path d={`${abCurvedPath} L ${getX(chartData.length - 1)} ${chartHeight - paddingY} L ${getX(0)} ${chartHeight - paddingY} Z`} fill="url(#areaAB)" />
               <path d={`${baCurvedPath} L ${getX(chartData.length - 1)} ${chartHeight - paddingY} L ${getX(0)} ${chartHeight - paddingY} Z`} fill="url(#areaBA)" />
 
-              {/* Curved Lines with Glow */}
               <path d={abCurvedPath} fill="none" stroke="#0ea5e9" strokeWidth="5" strokeLinecap="round" filter="url(#glow)" />
               <path d={baCurvedPath} fill="none" stroke="#f97316" strokeWidth="5" strokeLinecap="round" filter="url(#glow)" />
 
-              {/* Interactive Points */}
               {chartData.map((d, i) => (
                 <g key={i}>
                   <text x={getX(i)} y={chartHeight - 15} textAnchor="middle" className={`text-[11px] font-black ${d.hour === currentHour ? 'fill-sky-600' : 'fill-slate-400'}`}>{d.hour}</text>
-                  {d.ab > 0 && <circle cx={getX(i)} cy={getY(d.ab)} r="6" fill="white" stroke="#0ea5e9" strokeWidth="3" className="hover:r-8 transition-all cursor-pointer" />}
-                  {d.ba > 0 && <circle cx={getX(i)} cy={getY(d.ba)} r="6" fill="white" stroke="#f97316" strokeWidth="3" className="hover:r-8 transition-all cursor-pointer" />}
+                  {d.ab > 0 && <circle cx={getX(i)} cy={getY(d.ab)} r="6" fill="white" stroke="#0ea5e9" strokeWidth="3" />}
+                  {d.ba > 0 && <circle cx={getX(i)} cy={getY(d.ba)} r="6" fill="white" stroke="#f97316" strokeWidth="3" />}
                 </g>
               ))}
             </svg>
