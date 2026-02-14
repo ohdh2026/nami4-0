@@ -15,6 +15,10 @@ export const fetchRealtimeWeather = async (): Promise<WeatherInfo | null> => {
     });
 
     const jsonText = response.text;
+    if (!jsonText) {
+      throw new Error("AI 응답 데이터가 없습니다.");
+    }
+    
     const data = JSON.parse(jsonText);
     
     // 출처 URL 추출
