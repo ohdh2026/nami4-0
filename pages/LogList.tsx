@@ -5,14 +5,14 @@ import {
   Calendar, Ship as ShipIcon, User as UserIcon, CheckSquare, Square, X, Check, ArrowRight, Trash2, AlertTriangle
 } from 'lucide-react';
 import { OperationLog, Ship } from '../types';
-import * as XLSX from 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+import * as XLSX from 'xlsx';
 
 interface LogListProps {
   logs: OperationLog[];
   ships: Ship[];
   onEdit: (log: OperationLog) => void;
   onDelete: (id: string) => void;
-  onDeleteAll?: () => void; // 전체 삭제 프롭 추가
+  onDeleteAll?: () => void;
 }
 
 const LogList: React.FC<LogListProps> = ({ logs, ships, onEdit, onDelete, onDeleteAll }) => {
