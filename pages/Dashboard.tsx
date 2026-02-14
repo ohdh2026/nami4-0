@@ -104,7 +104,8 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, weather, onNavigateT
                    </span>
                    <h2 className="text-xl font-black">실시간 기상 관제</h2>
                 </div>
-                <a href={weather?.sourceUrl} target="_blank" rel="noreferrer" className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors">
+                {/* 사용자의 요청에 따라 네이버로 고정된 링크 */}
+                <a href={weather?.sourceUrl || "https://www.naver.com"} target="_blank" rel="noreferrer" className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors">
                   <ExternalLink size={18} className="text-slate-400" />
                 </a>
               </div>
@@ -146,7 +147,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, weather, onNavigateT
 
               <div className="flex justify-between items-center pt-6 border-t border-white/5">
                  <p className="text-[11px] font-bold text-slate-500 italic">
-                   Source: NAVER Weather (Update: {weather?.lastUpdated || '-'})
+                   Source: NAVER (Update: {weather?.lastUpdated || '-'})
                  </p>
                  {isWindy && (
                    <div className="flex items-center gap-2 px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-[10px] font-black animate-bounce border border-red-500/30">
