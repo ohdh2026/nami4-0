@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Ship, OperationLog } from '../types';
-import { Activity, Anchor, Users, Fuel, Clock, ArrowRight, MapPin, BarChart3, ArrowLeftRight } from 'lucide-react';
+import { Activity, Anchor, Users, Fuel, Clock, ArrowRight, BarChart3, ArrowLeftRight, TrendingUp } from 'lucide-react';
 
 interface DashboardProps {
   logs: OperationLog[];
@@ -16,8 +16,8 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
   
   const totalPassengersToday = completedLogsToday.reduce((sum, l) => sum + l.passengerCount, 0);
 
-  // 노선별 시간대별 상세 통계 집계
-  const getDetailedHourlyStats = () => {
+  // 데이터 집계 로직
+  const { detailedStats, chartData } = useMemo(() => {
     const stats: Record<string, { ab: number; ba: number; others: number; total: number }> = {};
     
     // 오늘 기록만 대상
@@ -39,12 +39,36 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
       stats[hour].total += log.passengerCount;
     });
 
-    // 시간 순 정렬 (최신 시간이 위로)
-    return Object.entries(stats).sort((a, b) => b[0].localeCompare(a[0]));
+    const sortedStats = Object.entries(stats).sort((a, b) => b[0].localeCompare(a[0]));
+    
+    // 그래프용 데이터 (시간 오름차순, 07:00 ~ 20:00 범위 보장 시각화용)
+    const chartHours = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
+    const chartPoints = chartHours.map(h => ({
+      hour: h,
+      ab: stats[h]?.ab || 0,
+      ba: stats[h]?.ba || 0
+    }));
+
+    return { detailedStats: sortedStats, chartData: chartPoints };
+  }, [logs, todayStr]);
+
+  const currentHour = new Date().getHours() + ':00';
+
+  // --- SVG 그래프용 계산 로직 ---
+  const chartWidth = 800;
+  const chartHeight = 250;
+  const padding = 40;
+  
+  const maxVal = Math.max(...chartData.map(d => Math.max(d.ab, d.ba)), 50); // 최소 50명 기준 스케일
+  const getY = (val: number) => chartHeight - (val / maxVal) * (chartHeight - padding * 2) - padding;
+  const getX = (idx: number) => (idx / (chartData.length - 1)) * (chartWidth - padding * 2) + padding;
+
+  const createPath = (dataKey: 'ab' | 'ba') => {
+    return chartData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d[dataKey])}`).join(' ');
   };
 
-  const detailedStats = getDetailedHourlyStats();
-  const currentHour = new Date().getHours() + ':00';
+  const abPath = createPath('ab');
+  const baPath = createPath('ba');
 
   return (
     <div className="space-y-8">
@@ -97,7 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* 노선별 상세 시간대 통계 (A->B, B->A 구분) */}
+        {/* 노선별 상세 시간대 통계 테이블 */}
         <div className="lg:col-span-2">
           <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-full">
             <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
@@ -151,15 +175,10 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
                 </tbody>
               </table>
             </div>
-            {detailedStats.length > 0 && (
-                <div className="p-4 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-400">
-                    * 출발 시간(Departure Time) 기준으로 자동 집계됩니다.
-                </div>
-            )}
           </section>
         </div>
 
-        {/* 실시간 운항 선박 (우측 사이드) */}
+        {/* 실시간 운항 선박 및 정원 요약 */}
         <div className="lg:col-span-1 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
@@ -204,10 +223,9 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
             )}
           </div>
 
-          {/* 선박별 정원 요약 (사이드 하단) */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
             <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <BarChart3 size={16} /> 선박 정원 요약
+                <BarChart3 size={16} /> 선박 정원 요약 (혼잡도)
             </h3>
             <div className="space-y-4">
               {ships.slice(0, 4).map(ship => {
@@ -232,6 +250,132 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, ships, onNavigateToLog }) =
           </div>
         </div>
       </div>
+
+      {/* 전문가용 승선 추이 꺽은선 그래프 섹션 (신규 추가) */}
+      <section className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100">
+                    <TrendingUp size={24} />
+                </div>
+                <div>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">노선별 승선 추이 분석</h2>
+                    <p className="text-slate-400 text-sm">시간대별 탑승객 변화량 트렌드 (실시간 반영)</p>
+                </div>
+            </div>
+            <div className="flex gap-4 p-1.5 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg shadow-sm">
+                    <div className="w-3 h-3 bg-sky-500 rounded-full"></div>
+                    <span className="text-xs font-bold text-slate-600">A → B (가평)</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg shadow-sm">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    <span className="text-xs font-bold text-slate-600">B → A (남이)</span>
+                </div>
+            </div>
+        </div>
+
+        <div className="relative w-full overflow-hidden group">
+            {/* SVG Chart */}
+            <svg 
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`} 
+              className="w-full h-auto drop-shadow-xl"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <defs>
+                <linearGradient id="gradAB" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
+                </linearGradient>
+                <linearGradient id="gradBA" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#f97316" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+
+              {/* Grid Lines */}
+              {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
+                <g key={i}>
+                  <line 
+                    x1={padding} 
+                    y1={getY(maxVal * p)} 
+                    x2={chartWidth - padding} 
+                    y2={getY(maxVal * p)} 
+                    stroke="#f1f5f9" 
+                    strokeWidth="1" 
+                  />
+                  <text 
+                    x={padding - 10} 
+                    y={getY(maxVal * p) + 4} 
+                    textAnchor="end" 
+                    className="text-[10px] fill-slate-300 font-mono"
+                  >
+                    {Math.round(maxVal * p)}
+                  </text>
+                </g>
+              ))}
+
+              {/* Time Labels (X-Axis) */}
+              {chartData.map((d, i) => (
+                <text 
+                  key={i} 
+                  x={getX(i)} 
+                  y={chartHeight - 10} 
+                  textAnchor="middle" 
+                  className={`text-[9px] font-bold ${d.hour === currentHour ? 'fill-sky-600' : 'fill-slate-400'}`}
+                >
+                  {d.hour}
+                </text>
+              ))}
+
+              {/* Area Fills */}
+              <path d={`${abPath} L ${getX(chartData.length - 1)} ${chartHeight - padding} L ${getX(0)} ${chartHeight - padding} Z`} fill="url(#gradAB)" />
+              <path d={`${baPath} L ${getX(chartData.length - 1)} ${chartHeight - padding} L ${getX(0)} ${chartHeight - padding} Z`} fill="url(#gradBA)" />
+
+              {/* Data Lines */}
+              <path d={abPath} fill="none" stroke="#0ea5e9" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={baPath} fill="none" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+              {/* Data Points */}
+              {chartData.map((d, i) => (
+                <g key={i} className="cursor-pointer">
+                  {d.ab > 0 && (
+                    <circle 
+                      cx={getX(i)} 
+                      cy={getY(d.ab)} 
+                      r="4" 
+                      fill="white" 
+                      stroke="#0ea5e9" 
+                      strokeWidth="2.5"
+                      className="hover:r-6 transition-all"
+                    />
+                  )}
+                  {d.ba > 0 && (
+                    <circle 
+                      cx={getX(i)} 
+                      cy={getY(d.ba)} 
+                      r="4" 
+                      fill="white" 
+                      stroke="#f97316" 
+                      strokeWidth="2.5"
+                      className="hover:r-6 transition-all"
+                    />
+                  )}
+                </g>
+              ))}
+            </svg>
+            
+            {/* Empty State Overlay */}
+            {totalPassengersToday === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+                    <div className="bg-white/80 px-6 py-3 rounded-2xl shadow-xl border border-slate-100 flex items-center gap-3">
+                        <Activity size={20} className="text-slate-300 animate-pulse" />
+                        <span className="text-sm font-bold text-slate-400">오늘 운항 데이터 수집 중...</span>
+                    </div>
+                </div>
+            )}
+        </div>
+      </section>
     </div>
   );
 };
