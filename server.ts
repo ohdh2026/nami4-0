@@ -45,6 +45,8 @@ const readJson = (filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf
 const writeJson = (filePath: string, data: any) => fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 
 // API Routes
+app.get('/api/health', (req: Request, res: Response) => res.json({ status: 'ok' }));
+
 app.get('/api/users', (req: Request, res: Response) => res.json(readJson(FILES.USERS)));
 app.post('/api/users', (req: Request, res: Response) => {
   writeJson(FILES.USERS, req.body);
@@ -108,22 +110,33 @@ app.get('/api/weather', async (req: Request, res: Response) => {
 });
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  const isProd = process.env.NODE_ENV === 'production';
+  
+  if (!isProd) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-    });
+    const distPath = path.join(__dirname, 'dist');
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req: Request, res: Response) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      console.error("Critical Error: 'dist' directory not found. Please run 'npm run build' first.");
+      app.get('*', (req: Request, res: Response) => {
+        res.status(500).send("Server is running, but frontend build (dist) is missing. Please check build logs.");
+      });
+    }
   }
 
   const PORT = process.env.PORT || 3000;
   app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`[SUCCESS] Naminara Server is running on port ${PORT}`);
+    console.log(`[INFO] Mode: ${isProd ? 'Production' : 'Development'}`);
   });
 }
 
