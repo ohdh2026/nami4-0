@@ -20,15 +20,28 @@ const FILES = {
   TELEGRAM: path.join(DATA_DIR, 'telegram.json'),
 };
 
-// 데이터 디렉토리 생성
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR);
+// 데이터 디렉토리 생성 및 쓰기 권한 테스트
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    console.log(`[INFO] Created data directory at: ${DATA_DIR}`);
+  }
+  
+  // 쓰기 권한 테스트용 임시 파일
+  const testFile = path.join(DATA_DIR, '.write_test');
+  fs.writeFileSync(testFile, `test-${Date.now()}`);
+  fs.unlinkSync(testFile);
+  console.log("[SUCCESS] Disk write test passed. Server has permission to save data.");
+} catch (err) {
+  console.error("[FATAL] Disk write test failed! Check directory permissions:", err);
+  process.exit(1);
 }
 
 // 초기 데이터 파일 생성
 const initFile = (filePath: string, initialData: any) => {
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, JSON.stringify(initialData, null, 2));
+    console.log(`[INFO] Initialized data file: ${path.basename(filePath)}`);
   }
 };
 
@@ -162,9 +175,17 @@ async function startServer() {
   }
 
   const PORT = process.env.PORT || 3000;
+  
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`[SUCCESS] Server is listening on port ${PORT}`);
+    console.log(`[INFO] Health check available at http://localhost:${PORT}/api/health`);
+  }).on('error', (err: any) => {
+    console.error("[FATAL] Server failed to listen:", err);
+    process.exit(1);
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("[FATAL] Unhandled error during startup:", err);
+  process.exit(1);
+});
