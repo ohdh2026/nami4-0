@@ -110,16 +110,12 @@ app.get('/api/weather', async (req: Request, res: Response) => {
 });
 
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const distPath = path.join(__dirname, 'dist');
+  // NODE_ENV가 production이거나, dist 폴더가 실제로 존재하면 운영 모드로 판단
+  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(distPath);
   
-  if (!isProd) {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(__dirname, 'dist');
+  if (isProd) {
+    console.log("[INFO] Production mode detected.");
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
       app.get('*', (req: Request, res: Response) => {
@@ -128,15 +124,21 @@ async function startServer() {
     } else {
       console.error("Critical Error: 'dist' directory not found. Please run 'npm run build' first.");
       app.get('*', (req: Request, res: Response) => {
-        res.status(500).send("Server is running, but frontend build (dist) is missing. Please check build logs.");
+        res.status(500).send("Frontend build (dist) is missing. Please run 'npm run build'.");
       });
     }
+  } else {
+    console.log("[INFO] Development mode detected. Starting Vite...");
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
   }
 
   const PORT = process.env.PORT || 3000;
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`[SUCCESS] Naminara Server is running on port ${PORT}`);
-    console.log(`[INFO] Mode: ${isProd ? 'Production' : 'Development'}`);
   });
 }
 
