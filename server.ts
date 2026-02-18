@@ -88,10 +88,13 @@ app.post('/api/login', (req: Request, res: Response) => {
 // Weather API (Proxy to Gemini)
 app.get('/api/weather', async (req: Request, res: Response) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("API Key not set");
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!apiKey) {
+      console.error("[ERROR] GEMINI_API_KEY is not set in environment variables.");
+      return res.status(500).json({ error: "API Key not configured on server." });
+    }
 
-    const ai = new GoogleGenAI({ apiKey: apiKey as string });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: "현재 경기도 가평군 남이섬의 실시간 날씨 정보를 알려줘. 반드시 temp(기온), condition(날씨상태), windSpeed(풍속 m/s), humidity(습도 %) 키를 가진 JSON 형식으로만 응답해. 예: {\"temp\": \"18°C\", \"condition\": \"맑음\", \"windSpeed\": \"3m/s\", \"humidity\": \"55%\"}",
@@ -101,11 +104,19 @@ app.get('/api/weather', async (req: Request, res: Response) => {
       },
     });
 
-    if (!response.text) throw new Error("No response text");
+    if (!response.text) throw new Error("AI returned an empty response.");
     res.json(JSON.parse(response.text));
-  } catch (error) {
-    console.error("Weather API Error:", error);
-    res.status(500).json({ error: "Failed to fetch weather" });
+  } catch (error: any) {
+    console.error("Weather API Error Details:", error);
+    
+    // 구체적인 에러 메시지 반환 (디버깅용)
+    const errorMessage = error.message || "Unknown error occurred";
+    res.status(500).json({ 
+      error: "기상 정보를 가져오지 못했습니다.",
+      details: errorMessage.includes("API key not valid") 
+        ? "API 키가 유효하지 않습니다. Cloudtype 설정을 확인해 주세요." 
+        : errorMessage
+    });
   }
 });
 
