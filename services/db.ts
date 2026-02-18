@@ -1,50 +1,71 @@
 
 import { User, Ship, OperationLog, TelegramConfig } from '../types';
-import { INITIAL_USERS, INITIAL_SHIPS, INITIAL_LOGS } from '../constants';
 
-const KEYS = {
-  USERS: 'naminara_users',
-  SHIPS: 'naminara_ships',
-  LOGS: 'naminara_logs',
-  TELEGRAM: 'naminara_telegram'
-};
+const API_BASE = '/api';
 
 export const db = {
-  getUsers: (): User[] => {
-    const data = localStorage.getItem(KEYS.USERS);
-    return data ? JSON.parse(data) : INITIAL_USERS;
+  getUsers: async (): Promise<User[]> => {
+    const res = await fetch(`${API_BASE}/users`);
+    return res.json();
   },
-  saveUsers: (users: User[]) => {
-    localStorage.setItem(KEYS.USERS, JSON.stringify(users));
-  },
-
-  getShips: (): Ship[] => {
-    const data = localStorage.getItem(KEYS.SHIPS);
-    return data ? JSON.parse(data) : INITIAL_SHIPS;
-  },
-  saveShips: (ships: Ship[]) => {
-    localStorage.setItem(KEYS.SHIPS, JSON.stringify(ships));
+  saveUsers: async (users: User[]) => {
+    await fetch(`${API_BASE}/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(users)
+    });
   },
 
-  getLogs: (): OperationLog[] => {
-    const data = localStorage.getItem(KEYS.LOGS);
-    // 데이터가 없으면 무조건 빈 배열([])을 반환하도록 설정 (INITIAL_LOGS가 []이므로)
-    return data ? JSON.parse(data) : INITIAL_LOGS;
+  getShips: async (): Promise<Ship[]> => {
+    const res = await fetch(`${API_BASE}/ships`);
+    return res.json();
   },
-  saveLogs: (logs: OperationLog[]) => {
-    localStorage.setItem(KEYS.LOGS, JSON.stringify(logs));
+  saveShips: async (ships: Ship[]) => {
+    await fetch(`${API_BASE}/ships`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ships)
+    });
   },
 
-  getTelegramConfig: (): TelegramConfig => {
-    const data = localStorage.getItem(KEYS.TELEGRAM);
-    return data ? JSON.parse(data) : { botToken: '', recipients: [] };
+  getLogs: async (): Promise<OperationLog[]> => {
+    const res = await fetch(`${API_BASE}/logs`);
+    return res.json();
   },
-  saveTelegramConfig: (config: TelegramConfig) => {
-    localStorage.setItem(KEYS.TELEGRAM, JSON.stringify(config));
+  saveLogs: async (logs: OperationLog[]) => {
+    await fetch(`${API_BASE}/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(logs)
+    });
+  },
+
+  getTelegramConfig: async (): Promise<TelegramConfig> => {
+    const res = await fetch(`${API_BASE}/telegram`);
+    return res.json();
+  },
+  saveTelegramConfig: async (config: TelegramConfig) => {
+    await fetch(`${API_BASE}/telegram`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    });
   },
   
-  // 전체 데이터 초기화 (강제 청소용)
-  clearAllLogs: () => {
-    localStorage.setItem(KEYS.LOGS, JSON.stringify([]));
+  clearAllLogs: async () => {
+    await fetch(`${API_BASE}/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([])
+    });
+  },
+
+  login: async (userId: string, password: string): Promise<{ success: boolean; user?: User; message?: string }> => {
+    const res = await fetch(`${API_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, password })
+    });
+    return res.json();
   }
 };

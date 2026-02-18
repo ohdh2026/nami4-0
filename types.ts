@@ -12,6 +12,7 @@ export interface User {
   role: UserRole;
   phone: string;
   joinDate: string;
+  password?: string; // 비밀번호 필드 추가
   telegramChatId?: string;
 }
 
