@@ -110,25 +110,39 @@ app.get('/api/weather', async (req: Request, res: Response) => {
 });
 
 async function startServer() {
-  const distPath = path.join(__dirname, 'dist');
-  // NODE_ENV가 production이거나, dist 폴더가 실제로 존재하면 운영 모드로 판단
-  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(distPath);
+  const isProd = process.env.NODE_ENV === 'production';
+  const distPath = path.resolve('dist');
+  const publicPath = path.resolve('public');
   
+  console.log(`[DIAGNOSTIC] Current Working Directory: ${process.cwd()}`);
+  console.log(`[DIAGNOSTIC] Dist Path: ${distPath}`);
+  console.log(`[DIAGNOSTIC] Dist Exists: ${fs.existsSync(distPath)}`);
+
   if (isProd) {
-    console.log("[INFO] Production mode detected.");
+    console.log("[INFO] Running in PRODUCTION mode");
+    
     if (fs.existsSync(distPath)) {
+      // 정적 파일 서비스
       app.use(express.static(distPath));
+      
+      // SPA를 위한 Catch-all 라우트
       app.get('*', (req: Request, res: Response) => {
-        res.sendFile(path.join(distPath, 'index.html'));
+        const indexPath = path.join(distPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          res.sendFile(indexPath);
+        } else {
+          console.error(`[ERROR] index.html not found at ${indexPath}`);
+          res.status(404).send("Frontend build exists but index.html is missing. Please check your build process.");
+        }
       });
     } else {
-      console.error("Critical Error: 'dist' directory not found. Please run 'npm run build' first.");
+      console.error("[ERROR] 'dist' directory not found.");
       app.get('*', (req: Request, res: Response) => {
-        res.status(500).send("Frontend build (dist) is missing. Please run 'npm run build'.");
+        res.status(500).send("Frontend build (dist) is missing. Did you run 'npm run build'?");
       });
     }
   } else {
-    console.log("[INFO] Development mode detected. Starting Vite...");
+    console.log("[INFO] Running in DEVELOPMENT mode");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -138,7 +152,7 @@ async function startServer() {
 
   const PORT = process.env.PORT || 3000;
   app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`[SUCCESS] Naminara Server is running on port ${PORT}`);
+    console.log(`[SUCCESS] Server is listening on port ${PORT}`);
   });
 }
 
